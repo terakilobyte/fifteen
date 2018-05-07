@@ -13,6 +13,7 @@ const WINDOW_SIZE: u32 = 400;
 struct MainState {
     board: Vec<u8>,
     zero: (u8, u8),
+    solved: bool,
 }
 
 impl MainState {
@@ -26,6 +27,7 @@ impl MainState {
         let s = MainState {
             board: slice.to_vec(),
             zero: (0, 0),
+            solved: false,
         };
         Ok(s)
     }
@@ -39,17 +41,13 @@ fn validate_board_state(board: &[u8]) -> bool {
             if board[j] == 0 {
                 zero_poz = j
             }
-            if i < j && board[i] > board[j] {
+            if i < j && board[j] != 0 && board[i] > board[j] {
                 inv_count += 1;
             }
         }
     }
     zero_poz /= 4;
-    if zero_poz % 2 == 0 {
-        inv_count % 2 != 0
-    } else {
-        inv_count % 2 == 0
-    }
+    zero_poz % 2 == 0 && inv_count % 2 != 0 || zero_poz % 2 != 0 && inv_count % 2 == 0
 }
 
 fn idx(x: usize, y: usize) -> usize {
@@ -67,7 +65,6 @@ fn swap(board: &mut Vec<u8>, loc1: (u8, u8), zero: (u8, u8)) {
 }
 
 fn do_swap(board: &mut Vec<u8>, loc1: (u8, u8), zero: (u8, u8)) {
-    println!("{:?}, {:?}", loc1, zero);
     let il1 = idx(loc1.0 as usize, loc1.1 as usize);
     let il2 = idx(zero.0 as usize, zero.1 as usize);
     let l1 = board[il1];
@@ -85,7 +82,9 @@ impl event::EventHandler for MainState {
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         let blue = graphics::Color::new(0.0, 0.0, 1.0, 1.0);
         let font = graphics::Font::new(ctx, "/DejaVuSerif.ttf", 20).unwrap();
+
         graphics::clear(ctx);
+
         for x in 0..4 {
             for y in 0..4 {
                 let val = self.board[idx(x, y)];
@@ -119,6 +118,20 @@ impl event::EventHandler for MainState {
                 }
             }
         }
+
+        let winning: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0];
+        if winning == &self.board[..] {
+            self.solved = true;
+            graphics::clear(ctx);
+            graphics::set_color(ctx, graphics::WHITE)?;
+            let text = graphics::Text::new(ctx, &"YOU WIN!", &font)?;
+            let f_w = font.get_width(&"YOU WIN!") as f32;
+            let f_h = font.get_height() as f32;
+            let center =
+                graphics::Point2::new(200.0 + (f_w / 2.0) - f_w, 200.0 + (f_h / 2.0) - f_h);
+            graphics::draw(ctx, &text, center, 0.0)?;
+        }
+
         graphics::present(ctx);
         Ok(())
     }
@@ -129,11 +142,13 @@ impl event::EventHandler for MainState {
         x: i32,
         y: i32,
     ) {
-        let loc = (
-            (x as f32 / 100f32).floor() as u8,
-            (y as f32 / 100f32).floor() as u8,
-        );
-        swap(&mut self.board, loc, self.zero)
+        if !self.solved {
+            let loc = (
+                (x as f32 / 100f32).floor() as u8,
+                (y as f32 / 100f32).floor() as u8,
+            );
+            swap(&mut self.board, loc, self.zero)
+        }
     }
 }
 
@@ -149,4 +164,33 @@ pub fn main() {
     }
     let state = &mut MainState::new(ctx).unwrap();
     event::run(ctx, state).unwrap();
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_validates_a_solvable_puzzle() {
+        let valid = &[6, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 12, 13, 3];
+        assert!(::validate_board_state(valid));
+    }
+    #[test]
+    fn it_validates_a_solved_puzzle() {
+        let valid = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0];
+        assert!(::validate_board_state(valid));
+    }
+    #[test]
+    fn it_rejects_canonical_unsolvable() {
+        let invalid = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 14, 0];
+        assert!(!::validate_board_state(invalid));
+    }
+    #[test]
+    fn it_validates_other_board_states() {
+        let invalid = &[15, 9, 13, 8, 7, 14, 12, 3, 11, 1, 5, 10, 4, 2, 0, 6];
+        assert!(!::validate_board_state(invalid));
+    }
+    #[test]
+    fn more_validation() {
+        let valid = &[12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
+        assert!(::validate_board_state(valid));
+    }
 }
