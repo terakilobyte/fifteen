@@ -1,11 +1,11 @@
 extern crate ggez;
 extern crate rand;
 
-use ggez::{Context, ContextBuilder, GameResult};
 use ggez::conf;
 use ggez::event::{self, MouseButton};
 use ggez::graphics;
-use rand::{Rng, thread_rng};
+use ggez::{Context, ContextBuilder, GameResult};
+use rand::{thread_rng, Rng};
 use std::{env, path};
 
 const WINDOW_SIZE: u32 = 400;
@@ -20,11 +20,35 @@ impl MainState {
         let mut board: Vec<u8> = (0..16).collect();
         let slice: &mut [u8] = &mut board;
         thread_rng().shuffle(slice);
+        while !validate_board_state(slice) {
+            thread_rng().shuffle(slice);
+        }
         let s = MainState {
             board: slice.to_vec(),
             zero: (0, 0),
         };
         Ok(s)
+    }
+}
+
+fn validate_board_state(board: &[u8]) -> bool {
+    let mut inv_count = 0;
+    let mut zero_poz = 0;
+    for i in 0..15 {
+        for j in 0..16 {
+            if board[j] == 0 {
+                zero_poz = j
+            }
+            if i < j && board[i] > board[j] {
+                inv_count += 1;
+            }
+        }
+    }
+    zero_poz /= 4;
+    if zero_poz % 2 == 0 {
+        inv_count % 2 != 0
+    } else {
+        inv_count % 2 == 0
     }
 }
 
