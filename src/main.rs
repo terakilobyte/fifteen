@@ -35,19 +35,19 @@ impl MainState {
 
 fn validate_board_state(board: &[u8]) -> bool {
     let mut inv_count = 0;
-    let mut zero_poz = 0;
+    let mut zerow = 0;
     for i in 0..15 {
         for j in 0..16 {
             if board[j] == 0 {
-                zero_poz = j
+                zerow = j
             }
             if i < j && board[j] != 0 && board[i] > board[j] {
                 inv_count += 1;
             }
         }
     }
-    zero_poz /= 4;
-    zero_poz % 2 == 0 && inv_count % 2 != 0 || zero_poz % 2 != 0 && inv_count % 2 == 0
+    zerow /= 4;
+    (zerow % 2 == 0) ^ (inv_count % 2 == 0)
 }
 
 fn idx(x: usize, y: usize) -> usize {
@@ -55,8 +55,8 @@ fn idx(x: usize, y: usize) -> usize {
 }
 
 fn swap(board: &mut Vec<u8>, loc1: (u8, u8), zero: (u8, u8)) {
-    let l1 = (loc1.0 as i32, loc1.1 as i32);
-    let z = (zero.0 as i32, zero.1 as i32);
+    let l1 = (i32::from(loc1.0), i32::from(loc1.1));
+    let z = (i32::from(zero.0), i32::from(zero.1));
     match ((l1.0 - z.0).abs() as u8, (l1.1 - z.1).abs() as u8) {
         (0, 1) => do_swap(board, loc1, zero),
         (1, 0) => do_swap(board, loc1, zero),
@@ -184,12 +184,12 @@ mod tests {
         assert!(!::validate_board_state(invalid));
     }
     #[test]
-    fn it_validates_other_board_states() {
+    fn it_invalidates_other_unsolvable_states() {
         let invalid = &[15, 9, 13, 8, 7, 14, 12, 3, 11, 1, 5, 10, 4, 2, 0, 6];
         assert!(!::validate_board_state(invalid));
     }
     #[test]
-    fn more_validation() {
+    fn it_validates_other_solvable_states() {
         let valid = &[12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
         assert!(::validate_board_state(valid));
     }
