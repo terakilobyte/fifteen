@@ -193,4 +193,42 @@ mod tests {
         let valid = &[12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
         assert!(::validate_board_state(valid));
     }
+    #[test]
+    fn it_allows_valid_move_left() {
+        let mut board = vec![12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
+        let swapped_board = &[12, 1, 10, 2, 7, 11, 4, 14, 5, 9, 0, 15, 8, 13, 6, 3];
+        ::swap(&mut board, (2, 2), (1, 2));
+        assert_eq!(board, swapped_board)
+    }
+
+    #[test]
+    fn it_allows_valid_move_right() {
+        let mut board = vec![12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
+        let swapped_board = &[12, 1, 10, 2, 7, 11, 4, 14, 0, 5, 9, 15, 8, 13, 6, 3];
+        ::swap(&mut board, (0, 2), (1, 2));
+        assert_eq!(board, swapped_board)
+    }
+    #[test]
+    fn it_allows_valid_move_down() {
+        let mut board = vec![12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
+        let swapped_board = &[12, 1, 10, 2, 7, 0, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
+        ::swap(&mut board, (1, 1), (1, 2));
+        assert_eq!(board, swapped_board)
+    }
+    #[test]
+    fn it_allows_valid_move_up() {
+        let mut board = vec![12, 1, 10, 2, 7, 0, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
+        let swapped_board = &[12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
+        ::swap(&mut board, (1, 2), (1, 1));
+        assert_eq!(board, swapped_board)
+    }
+    #[test]
+    fn it_disallows_invalid_move() {
+        let mut board = vec![12, 1, 10, 2, 7, 0, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
+        let board_copy = vec![12, 1, 10, 2, 7, 0, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
+        let swapped_board = &[0, 1, 10, 2, 7, 12, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
+        ::swap(&mut board, (0, 0), (1, 1));
+        assert_ne!(board, swapped_board);
+        assert_eq!(board, board_copy)
+    }
 }
