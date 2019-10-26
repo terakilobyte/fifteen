@@ -4,11 +4,13 @@ extern crate rand;
 use ggez::conf;
 use ggez::event::{self, MouseButton};
 use ggez::graphics;
-use ggez::{Context, ContextBuilder, GameResult};
+use ggez::{nalgebra as na, Context, ContextBuilder, GameResult};
 use rand::{thread_rng, Rng};
 use std::{env, path};
 
-const WINDOW_SIZE: u32 = 400;
+const WINDOW_SIZE: f32 = 400_f32;
+
+type Point2 = na::Point2<f32>;
 
 struct MainState {
     board: Vec<u8>,
@@ -17,19 +19,18 @@ struct MainState {
 }
 
 impl MainState {
-    fn new(_ctx: &mut Context) -> GameResult<MainState> {
+    fn new() -> Self {
         let mut board: Vec<u8> = (0..16).collect();
         let slice: &mut [u8] = &mut board;
         thread_rng().shuffle(slice);
         while !validate_board_state(slice) {
             thread_rng().shuffle(slice);
         }
-        let s = MainState {
+        MainState {
             board: slice.to_vec(),
             zero: (0, 0),
             solved: false,
-        };
-        Ok(s)
+        }
     }
 }
 
@@ -75,72 +76,105 @@ fn do_swap(board: &mut Vec<u8>, loc1: (u8, u8), zero: (u8, u8)) {
 }
 
 impl event::EventHandler for MainState {
-    fn update(&mut self, _ctx: &mut Context) -> GameResult<()> {
+    fn update(&mut self, _ctx: &mut Context) -> GameResult {
         Ok(())
     }
 
-    fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
+    fn draw(&mut self, ctx: &mut Context) -> GameResult {
+        graphics::clear(ctx, graphics::BLACK);
         let blue = graphics::Color::new(0.0, 0.0, 1.0, 1.0);
-        let font = graphics::Font::new(ctx, "/DejaVuSerif.ttf", 20).unwrap();
-
-        graphics::clear(ctx);
+        let font = graphics::Font::new(ctx, "/DejaVuSerif.ttf").unwrap();
 
         for x in 0..4 {
             for y in 0..4 {
                 let val = self.board[idx(x, y)];
                 match val {
                     0 => {
-                        let s =
-                            graphics::Rect::new(x as f32 * 100.0, y as f32 * 100.0, 100.0, 100.0);
-                        graphics::set_color(ctx, graphics::BLACK)?;
-                        graphics::rectangle(ctx, graphics::DrawMode::Fill, s)?;
+                        let s = graphics::Rect::new(
+                            x as f32 * 100.0,
+                            y as f32 * 100.0,
+                            100.0,
+                            100.0,
+                        );
+                        graphics::Mesh::new_rectangle(
+                            ctx,
+                            graphics::DrawMode::fill(),
+                            s,
+                            graphics::BLACK,
+                        )?;
                         self.zero = (x as u8, y as u8)
                     }
                     _ => {
-                        let text = graphics::Text::new(ctx, &val.to_string(), &font)?;
-                        let f_w = font.get_width(&val.to_string()) as f32;
-                        let f_h = font.get_height() as f32;
-                        let center = graphics::Point2::new(
-                            (x as f32 * 100.0 + 50.0 + f_w / 2.0)
-                                - font.get_width(&val.to_string()) as f32,
-                            (y as f32 * 100.0 + 50.0 + f_h / 2.0) - font.get_height() as f32,
+                        let b_bounds = graphics::Rect::new(
+                            x as f32 * 100.0,
+                            y as f32 * 100.0,
+                            99.0,
+                            99.0,
                         );
-                        let s =
-                            graphics::Rect::new(x as f32 * 100.0, y as f32 * 100.0, 100.0, 100.0);
-                        graphics::set_color(ctx, blue)?;
-                        graphics::rectangle(ctx, graphics::DrawMode::Fill, s)?;
-                        graphics::set_color(ctx, graphics::WHITE)?;
-                        let b = graphics::Rect::new(x as f32 * 100.0, y as f32 * 100.0, 99.0, 99.0);
 
-                        graphics::rectangle(ctx, graphics::DrawMode::Line(1.0), b)?;
-                        graphics::draw(ctx, &text, center, 0.0)?;
+                        let b = graphics::Mesh::new_rectangle(
+                            ctx,
+                            graphics::DrawMode::fill(),
+                            b_bounds,
+                            graphics::WHITE,
+                        )?;
+                        graphics::draw(
+                            ctx,
+                            &b,
+                            graphics::DrawParam::default(),
+                        )?;
+                        let text = graphics::Text::new((
+                            u8::to_string(&val),
+                            font,
+                            18.0,
+                        ));
+                        let f_w = text.dimensions(ctx).0 as f32 / 2.0;
+                        let f_h = text.dimensions(ctx).1 as f32 / 2.0;
+                        graphics::draw(
+                            ctx,
+                            &text,
+                            graphics::DrawParam::new().color(blue).dest(
+                                Point2::new(
+                                    b_bounds.x + 50.0 - f_w,
+                                    b_bounds.y + 50.0 - f_h,
+                                ),
+                            ),
+                        )?;
                     }
                 }
             }
         }
 
-        let winning: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0];
+        let winning: &[u8] =
+            &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0];
         if winning == &self.board[..] {
             self.solved = true;
-            graphics::clear(ctx);
-            graphics::set_color(ctx, graphics::WHITE)?;
-            let text = graphics::Text::new(ctx, &"YOU WIN!", &font)?;
-            let f_w = font.get_width(&"YOU WIN!") as f32;
-            let f_h = font.get_height() as f32;
-            let center =
-                graphics::Point2::new(200.0 + (f_w / 2.0) - f_w, 200.0 + (f_h / 2.0) - f_h);
-            graphics::draw(ctx, &text, center, 0.0)?;
+            graphics::clear(ctx, graphics::BLACK);
+            let text = graphics::Text::new(("You Win!", font, 36.0));
+            let f_w = text.dimensions(ctx).0 as f32;
+            let f_h = text.dimensions(ctx).1 as f32;
+            let center = Point2::new(
+                200.0 + (f_w / 2.0) - f_w,
+                200.0 + (f_h / 2.0) - f_h,
+            );
+            graphics::draw(
+                ctx,
+                &text,
+                graphics::DrawParam::new()
+                    .color(graphics::WHITE)
+                    .dest(center),
+            )?;
         }
 
-        graphics::present(ctx);
+        graphics::present(ctx)?;
         Ok(())
     }
     fn mouse_button_down_event(
         &mut self,
         _ctx: &mut Context,
         _button: MouseButton,
-        x: i32,
-        y: i32,
+        x: f32,
+        y: f32,
     ) {
         if !self.solved {
             let loc = (
@@ -152,18 +186,22 @@ impl event::EventHandler for MainState {
     }
 }
 
-pub fn main() {
-    let cb = ContextBuilder::new("15", "ggez")
-        .window_setup(conf::WindowSetup::default().title("15"))
-        .window_mode(conf::WindowMode::default().dimensions(WINDOW_SIZE, WINDOW_SIZE));
-    let ctx = &mut cb.build().unwrap();
+pub fn main() -> GameResult {
+    let mut cb = ContextBuilder::new("Fifteen", "nathan");
     if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
         let mut path = path::PathBuf::from(manifest_dir);
         path.push("resources");
-        ctx.filesystem.mount(&path, true);
+        cb = cb.add_resource_path(path);
     }
-    let state = &mut MainState::new(ctx).unwrap();
-    event::run(ctx, state).unwrap();
+    let (ctx, events_loop) = &mut cb
+        .window_setup(conf::WindowSetup::default().title("Fifteen!"))
+        .window_mode(
+            conf::WindowMode::default().dimensions(WINDOW_SIZE, WINDOW_SIZE),
+        )
+        .build()?;
+
+    let state = &mut MainState::new();
+    event::run(ctx, events_loop, state)
 }
 
 #[cfg(test)]
@@ -195,38 +233,49 @@ mod tests {
     }
     #[test]
     fn it_allows_valid_move_left() {
-        let mut board = vec![12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
-        let swapped_board = &[12, 1, 10, 2, 7, 11, 4, 14, 5, 9, 0, 15, 8, 13, 6, 3];
+        let mut board =
+            vec![12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
+        let swapped_board =
+            &[12, 1, 10, 2, 7, 11, 4, 14, 5, 9, 0, 15, 8, 13, 6, 3];
         ::swap(&mut board, (2, 2), (1, 2));
         assert_eq!(board, swapped_board)
     }
 
     #[test]
     fn it_allows_valid_move_right() {
-        let mut board = vec![12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
-        let swapped_board = &[12, 1, 10, 2, 7, 11, 4, 14, 0, 5, 9, 15, 8, 13, 6, 3];
+        let mut board =
+            vec![12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
+        let swapped_board =
+            &[12, 1, 10, 2, 7, 11, 4, 14, 0, 5, 9, 15, 8, 13, 6, 3];
         ::swap(&mut board, (0, 2), (1, 2));
         assert_eq!(board, swapped_board)
     }
     #[test]
     fn it_allows_valid_move_down() {
-        let mut board = vec![12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
-        let swapped_board = &[12, 1, 10, 2, 7, 0, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
+        let mut board =
+            vec![12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
+        let swapped_board =
+            &[12, 1, 10, 2, 7, 0, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
         ::swap(&mut board, (1, 1), (1, 2));
         assert_eq!(board, swapped_board)
     }
     #[test]
     fn it_allows_valid_move_up() {
-        let mut board = vec![12, 1, 10, 2, 7, 0, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
-        let swapped_board = &[12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
+        let mut board =
+            vec![12, 1, 10, 2, 7, 0, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
+        let swapped_board =
+            &[12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
         ::swap(&mut board, (1, 2), (1, 1));
         assert_eq!(board, swapped_board)
     }
     #[test]
     fn it_disallows_invalid_move() {
-        let mut board = vec![12, 1, 10, 2, 7, 0, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
-        let board_copy = vec![12, 1, 10, 2, 7, 0, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
-        let swapped_board = &[0, 1, 10, 2, 7, 12, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
+        let mut board =
+            vec![12, 1, 10, 2, 7, 0, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
+        let board_copy =
+            vec![12, 1, 10, 2, 7, 0, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
+        let swapped_board =
+            &[0, 1, 10, 2, 7, 12, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
         ::swap(&mut board, (0, 0), (1, 1));
         assert_ne!(board, swapped_board);
         assert_eq!(board, board_copy)
