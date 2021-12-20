@@ -3,14 +3,13 @@ extern crate rand;
 
 use ggez::conf;
 use ggez::event::{self, MouseButton};
-use ggez::graphics;
-use ggez::{nalgebra as na, Context, ContextBuilder, GameResult};
-use rand::{thread_rng, Rng};
+use ggez::graphics::{self};
+use ggez::mint::Point2;
+use ggez::{Context, ContextBuilder, GameResult};
+use rand::{seq::SliceRandom, thread_rng};
 use std::{env, path};
 
 const WINDOW_SIZE: f32 = 400_f32;
-
-type Point2 = na::Point2<f32>;
 
 struct MainState {
     board: Vec<u8>,
@@ -22,9 +21,9 @@ impl MainState {
     fn new() -> Self {
         let mut board: Vec<u8> = (0..16).collect();
         let slice: &mut [u8] = &mut board;
-        thread_rng().shuffle(slice);
+        slice.shuffle(&mut thread_rng());
         while !validate_board_state(slice) {
-            thread_rng().shuffle(slice);
+            slice.shuffle(&mut thread_rng());
         }
         MainState {
             board: slice.to_vec(),
@@ -52,7 +51,7 @@ fn validate_board_state(board: &[u8]) -> bool {
 }
 
 fn idx(x: usize, y: usize) -> usize {
-    x + 4 * y
+    x.wrapping_mul(4).wrapping_add(y)
 }
 
 fn swap(board: &mut Vec<u8>, loc1: (u8, u8), zero: (u8, u8)) {
@@ -81,87 +80,66 @@ impl event::EventHandler for MainState {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
-        graphics::clear(ctx, graphics::BLACK);
+        graphics::clear(ctx, graphics::Color::BLACK);
         let blue = graphics::Color::new(0.0, 0.0, 1.0, 1.0);
         let font = graphics::Font::new(ctx, "/DejaVuSerif.ttf").unwrap();
 
         for x in 0..4 {
             for y in 0..4 {
+                // dbg!(&x, &y);
                 let val = self.board[idx(x, y)];
                 match val {
                     0 => {
-                        let s = graphics::Rect::new(
-                            x as f32 * 100.0,
-                            y as f32 * 100.0,
-                            100.0,
-                            100.0,
-                        );
+                        let s =
+                            graphics::Rect::new(x as f32 * 100.0, y as f32 * 100.0, 100.0, 100.0);
                         graphics::Mesh::new_rectangle(
                             ctx,
                             graphics::DrawMode::fill(),
                             s,
-                            graphics::BLACK,
+                            graphics::Color::BLACK,
                         )?;
                         self.zero = (x as u8, y as u8)
                     }
                     _ => {
-                        let b_bounds = graphics::Rect::new(
-                            x as f32 * 100.0,
-                            y as f32 * 100.0,
-                            99.0,
-                            99.0,
-                        );
+                        let b_bounds =
+                            graphics::Rect::new(x as f32 * 100.0, y as f32 * 100.0, 99.0, 99.0);
 
                         let b = graphics::Mesh::new_rectangle(
                             ctx,
                             graphics::DrawMode::fill(),
                             b_bounds,
-                            graphics::WHITE,
+                            graphics::Color::WHITE,
                         )?;
-                        graphics::draw(
-                            ctx,
-                            &b,
-                            graphics::DrawParam::default(),
-                        )?;
-                        let text = graphics::Text::new((
-                            u8::to_string(&val),
-                            font,
-                            18.0,
-                        ));
-                        let f_w = text.dimensions(ctx).0 as f32 / 2.0;
-                        let f_h = text.dimensions(ctx).1 as f32 / 2.0;
+                        graphics::draw(ctx, &b, graphics::DrawParam::default())?;
+                        let text = graphics::Text::new((u8::to_string(&val), font, 18.0));
+                        let f_w = text.dimensions(ctx).x as f32 / 2.0;
+                        let f_h = text.dimensions(ctx).y as f32 / 2.0;
                         graphics::draw(
                             ctx,
                             &text,
-                            graphics::DrawParam::new().color(blue).dest(
-                                Point2::new(
-                                    b_bounds.x + 50.0 - f_w,
-                                    b_bounds.y + 50.0 - f_h,
-                                ),
-                            ),
+                            graphics::DrawParam::new().color(blue).dest(Point2::from([
+                                b_bounds.x + 50.0 - f_w,
+                                b_bounds.y + 50.0 - f_h,
+                            ])),
                         )?;
                     }
                 }
             }
         }
 
-        let winning: &[u8] =
-            &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0];
+        let winning: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0];
         if winning == &self.board[..] {
             self.solved = true;
-            graphics::clear(ctx, graphics::BLACK);
+            graphics::clear(ctx, graphics::Color::BLACK);
             let text = graphics::Text::new(("You Win!", font, 36.0));
-            let f_w = text.dimensions(ctx).0 as f32;
-            let f_h = text.dimensions(ctx).1 as f32;
-            let center = Point2::new(
-                200.0 + (f_w / 2.0) - f_w,
-                200.0 + (f_h / 2.0) - f_h,
-            );
+            let f_w = text.dimensions(ctx).x as f32;
+            let f_h = text.dimensions(ctx).y as f32;
+            let center = Point2::from([200.0 + (f_w / 2.0) - f_w, 200.0 + (f_h / 2.0) - f_h]);
             graphics::draw(
                 ctx,
                 &text,
                 graphics::DrawParam::new()
-                    .color(graphics::WHITE)
+                    .color(graphics::Color::WHITE)
                     .dest(center),
             )?;
         }
@@ -193,14 +171,12 @@ pub fn main() -> GameResult {
         path.push("resources");
         cb = cb.add_resource_path(path);
     }
-    let (ctx, events_loop) = &mut cb
+    let (ctx, events_loop) = cb
         .window_setup(conf::WindowSetup::default().title("Fifteen!"))
-        .window_mode(
-            conf::WindowMode::default().dimensions(WINDOW_SIZE, WINDOW_SIZE),
-        )
+        .window_mode(conf::WindowMode::default().dimensions(WINDOW_SIZE, WINDOW_SIZE))
         .build()?;
 
-    let state = &mut MainState::new();
+    let state = MainState::new();
     event::run(ctx, events_loop, state)
 }
 
@@ -233,49 +209,38 @@ mod tests {
     }
     #[test]
     fn it_allows_valid_move_left() {
-        let mut board =
-            vec![12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
-        let swapped_board =
-            &[12, 1, 10, 2, 7, 11, 4, 14, 5, 9, 0, 15, 8, 13, 6, 3];
+        let mut board = vec![12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
+        let swapped_board = &[12, 1, 10, 2, 7, 11, 4, 14, 5, 9, 0, 15, 8, 13, 6, 3];
         ::swap(&mut board, (2, 2), (1, 2));
         assert_eq!(board, swapped_board)
     }
 
     #[test]
     fn it_allows_valid_move_right() {
-        let mut board =
-            vec![12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
-        let swapped_board =
-            &[12, 1, 10, 2, 7, 11, 4, 14, 0, 5, 9, 15, 8, 13, 6, 3];
+        let mut board = vec![12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
+        let swapped_board = &[12, 1, 10, 2, 7, 11, 4, 14, 0, 5, 9, 15, 8, 13, 6, 3];
         ::swap(&mut board, (0, 2), (1, 2));
         assert_eq!(board, swapped_board)
     }
     #[test]
     fn it_allows_valid_move_down() {
-        let mut board =
-            vec![12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
-        let swapped_board =
-            &[12, 1, 10, 2, 7, 0, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
+        let mut board = vec![12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
+        let swapped_board = &[12, 1, 10, 2, 7, 0, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
         ::swap(&mut board, (1, 1), (1, 2));
         assert_eq!(board, swapped_board)
     }
     #[test]
     fn it_allows_valid_move_up() {
-        let mut board =
-            vec![12, 1, 10, 2, 7, 0, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
-        let swapped_board =
-            &[12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
+        let mut board = vec![12, 1, 10, 2, 7, 0, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
+        let swapped_board = &[12, 1, 10, 2, 7, 11, 4, 14, 5, 0, 9, 15, 8, 13, 6, 3];
         ::swap(&mut board, (1, 2), (1, 1));
         assert_eq!(board, swapped_board)
     }
     #[test]
     fn it_disallows_invalid_move() {
-        let mut board =
-            vec![12, 1, 10, 2, 7, 0, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
-        let board_copy =
-            vec![12, 1, 10, 2, 7, 0, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
-        let swapped_board =
-            &[0, 1, 10, 2, 7, 12, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
+        let mut board = vec![12, 1, 10, 2, 7, 0, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
+        let board_copy = vec![12, 1, 10, 2, 7, 0, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
+        let swapped_board = &[0, 1, 10, 2, 7, 12, 4, 14, 5, 11, 9, 15, 8, 13, 6, 3];
         ::swap(&mut board, (0, 0), (1, 1));
         assert_ne!(board, swapped_board);
         assert_eq!(board, board_copy)
