@@ -19,7 +19,7 @@ struct MainState {
 
 impl MainState {
     fn new() -> Self {
-        let mut board: Vec<u8> = (0..16).collect();
+        let mut board: Vec<u8> = (0..=15).collect();
         let slice: &mut [u8] = &mut board;
         slice.shuffle(&mut thread_rng());
         while !validate_board_state(slice) {
@@ -51,7 +51,7 @@ fn validate_board_state(board: &[u8]) -> bool {
 }
 
 fn idx(x: usize, y: usize) -> usize {
-    x.wrapping_mul(4).wrapping_add(y)
+    y.wrapping_mul(4).wrapping_add(x)
 }
 
 fn swap(board: &mut Vec<u8>, loc1: (u8, u8), zero: (u8, u8)) {
@@ -86,7 +86,6 @@ impl event::EventHandler for MainState {
 
         for x in 0..4 {
             for y in 0..4 {
-                // dbg!(&x, &y);
                 let val = self.board[idx(x, y)];
                 match val {
                     0 => {
@@ -127,8 +126,11 @@ impl event::EventHandler for MainState {
             }
         }
 
-        let winning: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0];
-        if winning == &self.board[..] {
+        let winning: Vec<&[u8]> = vec![
+            &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0],
+            &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0, 13, 14, 15],
+        ];
+        if winning.contains(&self.board[..].as_ref()) {
             self.solved = true;
             graphics::clear(ctx, graphics::Color::BLACK);
             let text = graphics::Text::new(("You Win!", font, 36.0));
