@@ -5,4 +5,4 @@ authors = ["nathan <terakilobyte@gmail.com>"]
 
 [dependencies]
 rand = "*"
-ggez = "0.7.0"
+ggez = "0.8.1"
